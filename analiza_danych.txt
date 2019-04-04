@@ -1,0 +1,180 @@
+////////////////////////////////////////////////////////////////////////////////////////
+///zad 1
+
+SELECT r.nazwa nazwa_rodzaju, count(*) liczba_styp, sum(s.kwota) suma 
+FROM swiadczenia s, rodzaje_swiadczen r 
+WHERE s.symbol_swiadczenia =r.symbol
+GROUP BY r.nazwa;
+
+////////////////////////////////////////////////////////////////////////////////////////
+///zad 2
+
+SELECT r.nazwa nazwa_rodzaju,s.rok_akademicki ||' '|| s.rodzaj_semestru semestr_akademicki,count(*) liczba_styp,sum(s.kwota)suma 
+FROM swiadczenia s, rodzaje_swiadczen r 
+WHERE s.symbol_swiadczenia =r.symbol
+GROUP BY r.nazwa,s.rok_akademicki,s.rodzaj_semestru
+ORDER BY r.nazwa, semestr_akademicki;
+
+////////////////////////////////////////////////////////////////////////////////////////
+///zad 3
+
+CREATE VIEW swiadczenia_v AS 
+SELECT r.nazwa nazwa_rodzaju,s.rok_akademicki ||' '|| s.rodzaj_semestru semestr_akademicki,count(*) liczba_styp,sum(s.kwota)kwota_sum 
+FROM swiadczenia s, rodzaje_swiadczen r 
+WHERE s.symbol_swiadczenia =r.symbol
+GROUP BY r.nazwa,s.rok_akademicki,s.rodzaj_semestru
+ORDER BY r.nazwa, semestr_akademicki;
+
+////////////////////////////////////////////////////////////////////////////////////////
+///zad 4
+
+SELECT * FROM swiadczenia_v 
+ ORDER BY nazwa_rodzaju, semestr_akademicki;
+
+SELECT * FROM swiadczenia_v 
+ MODEL DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum)
+ RULES()
+ ORDER BY rodzaj, semestr;
+
+////////////////////////////////////////////////////////////////////////////////////////
+///5
+
+ SELECT * FROM swiadczenia_v 
+ MODEL DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,0 AS kwota_srednia) --round(kwota_sum/liczba_styp,2) as srednia )
+ RULES( kwota_srednia = kwota_sum/liczba_styp  )
+ ORDER BY rodzaj, semestr;
+
+////////////////////////////////////////////////////////////////////////////////////////
+///6
+ SELECT * FROM swiadczenia_v 
+ MODEL DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia )
+ RULES SEQUENTIAL ORDER( liczba_styp['stypendium sportowe','wszystkie']=sum(liczba_styp)['stypendium sportowe', ANY],
+ liczba_styp['stypendium socjalne','wszystkie']=sum(liczba_styp)['stypendium socjalne', ANY],
+ liczba_styp['stypendium za wyniki w nauce','wszystkie']=sum(liczba_styp)['stypendium za wyniki w nauce', ANY]
+ )
+ ORDER BY rodzaj, semestr;
+
+////////////////////////////////////////////////////////////////////////////////////////
+///zad 7
+SELECT * FROM swiadczenia_v 
+ MODEL DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia )
+ RULES SEQUENTIAL ORDER
+ ( liczba_styp[FOR rodzaj IN ('stypendium socjalne','stypendium sportowe','stypendium za wyniki w nauce'),'wszystkie']= sum (liczba_styp)[cv(rodzaj),ANY]
+ )
+ ORDER BY rodzaj, semestr;
+
+//////////////////////////////////////////////////////////////////////////////////////
+///zad 8
+wstawiono nowe wiersze do bazy danych
+///zad 9
+pojawil siê wiesz wstawony do tablicy ale nie bylo wiersza - podsumuj¹cego!!!
+
+//////////////////////////////////////////////////////////////////////////////////////
+///zad 10
+
+ SELECT * FROM swiadczenia_v 
+ MODEL DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia )
+ RULES SEQUENTIAL ORDER
+ ( liczba_styp[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (liczba_styp)[cv(rodzaj),ANY]
+ )
+ ORDER BY rodzaj, semestr;
+
+//////////////////////////////////////////////////////////////////////////////////////
+///zad 11
+
+SELECT * FROM swiadczenia_v 
+ MODEL DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia )
+ RULES --sequential order
+ ( liczba_styp[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (liczba_styp)[cv(rodzaj),ANY],
+ kwota_sum[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (kwota_sum)[cv(rodzaj),ANY],
+ srednia[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']=  round(sum (kwota_sum)[cv(rodzaj),ANY]/sum (liczba_styp)[cv(rodzaj),ANY],2)
+ )
+ ORDER BY rodzaj, semestr;
+
+//////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// zad 12
+SELECT * FROM swiadczenia_v 
+ MODEL DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia )
+ RULES --sequential order
+(liczba_styp[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (liczba_styp)[cv(rodzaj),ANY],
+kwota_sum[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (kwota_sum)[cv(rodzaj),ANY],
+srednia[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']=  round(sum (kwota_sum)[cv(rodzaj),ANY]/sum (liczba_styp)[cv(rodzaj),ANY],2),--,
+liczba_styp['wszystkie','wszystkie']= sum (liczba_styp)[ANY,ANY]-sum(liczba_styp)[ANY,'wszystkie'],
+kwota_sum['wszystkie','wszystkie']= sum (kwota_sum)[ANY,ANY]-sum (kwota_sum)[ANY,'wszystkie'],
+srednia['wszystkie','wszystkie']= (round(sum (kwota_sum)[ANY,ANY]/sum (liczba_styp)[ANY,ANY],2))
+)
+ ORDER BY rodzaj, semestr;
+/////////////////////////////////////////////////////////////////////////////////////
+///zad 13
+
+SELECT count (DISTINCT student_id) liczba_studentow, rok_akademicki||' '||rodzaj_semestru AS semestr_akademicki  
+FROM oceny GROUP BY rok_akademicki,rodzaj_semestru
+ORDER BY semestr_akademicki;
+
+/////////////////////////////////////////////////////////////////////////////////////
+///14
+
+SELECT * FROM swiadczenia_v MODEL 
+REFERENCE studenci_mod ON ( SELECT *  FROM student_oceny)
+DIMENSION BY (semestr_akademicki) MEASURES (liczba_studentow AS licz)
+MAIN result
+DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia,0 AS l_stud )
+ RULES --sequential order
+( liczba_styp[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (liczba_styp)[cv(rodzaj),ANY],
+kwota_sum[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (kwota_sum)[cv(rodzaj),ANY],
+srednia[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']=  round(sum (kwota_sum)[cv(rodzaj),ANY]/sum (liczba_styp)[cv(rodzaj),ANY],2),
+liczba_styp['wszystkie','wszystkie']= sum (liczba_styp)[ANY,ANY]-sum(liczba_styp)[ANY,'wszystkie'],
+kwota_sum['wszystkie','wszystkie']= sum (kwota_sum)[ANY,ANY]-sum (kwota_sum)[ANY,'wszystkie'],
+srednia['wszystkie','wszystkie']= (round(sum (kwota_sum)[ANY,ANY]/sum (liczba_styp)[ANY,ANY],2)),
+ l_stud[ANY,ANY] = licz[cv(semestr)]
+)
+ORDER BY rodzaj, semestr;
+ 
+////////////////////////////////////////////////////////////////////////////////////////
+///zad 15
+
+SELECT * FROM swiadczenia_v MODEL 
+REFERENCE studenci_mod ON ( SELECT *  FROM student_oceny)
+DIMENSION BY (semestr_akademicki) MEASURES (liczba_studentow AS licz)
+MAIN result
+DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia,0 AS l_stud)
+ RULES --sequential order
+ ( liczba_styp[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (liczba_styp)[cv(rodzaj),ANY],
+ kwota_sum[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (kwota_sum)[cv(rodzaj),ANY],
+ srednia[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']=  round(sum (kwota_sum)[cv(rodzaj),ANY]/sum (liczba_styp)[cv(rodzaj),ANY],2),
+ liczba_styp['wszystkie','wszystkie']= sum (liczba_styp)[ANY,ANY]-sum(liczba_styp)[ANY,'wszystkie'],
+kwota_sum['wszystkie','wszystkie']= sum (kwota_sum)[ANY,ANY]-sum (kwota_sum)[ANY,'wszystkie'],
+srednia['wszystkie','wszystkie']= (round(sum (kwota_sum)[ANY,ANY]/sum (liczba_styp)[ANY,ANY],2)),
+ l_stud[ANY,ANY] =  round(liczba_styp[cv(rodzaj),cv(semestr)]/licz[cv(semestr)]*100,2)
+ )
+ ORDER BY rodzaj, semestr;
+
+//////////////////////////////////////////////////////////////////////////////////////////
+///zad 16
+
+CREATE TABLE analiza_swiadczen AS 
+SELECT * FROM swiadczenia_v MODEL 
+REFERENCE studenci_mod ON ( SELECT *  FROM student_oceny)
+DIMENSION BY (semestr_akademicki) MEASURES (liczba_studentow AS licz)
+MAIN result
+DIMENSION BY (nazwa_rodzaju AS rodzaj, semestr_akademicki AS semestr)
+ MEASURES (liczba_styp, kwota_sum,round(kwota_sum/liczba_styp,2) AS srednia,0 AS l_stud)
+ RULES --sequential order
+ ( liczba_styp[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (liczba_styp)[cv(rodzaj),ANY],
+ kwota_sum[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']= sum (kwota_sum)[cv(rodzaj),ANY],
+ srednia[FOR rodzaj IN (SELECT nazwa FROM rodzaje_swiadczen),'wszystkie']=  round(sum (kwota_sum)[cv(rodzaj),ANY]/sum (liczba_styp)[cv(rodzaj),ANY],2),
+ liczba_styp['wszystkie','wszystkie']= sum (liczba_styp)[ANY,ANY]-sum(liczba_styp)[ANY,'wszystkie'],
+kwota_sum['wszystkie','wszystkie']= sum (kwota_sum)[ANY,ANY]-sum (kwota_sum)[ANY,'wszystkie'],
+srednia['wszystkie','wszystkie']= (round(sum (kwota_sum)[ANY,ANY]/sum (liczba_styp)[ANY,ANY],2)),
+ l_stud[ANY,ANY] =  round(liczba_styp[cv(rodzaj),cv(semestr)]/licz[cv(semestr)]*100,2)
+ )
+ ORDER BY rodzaj, semestr;
